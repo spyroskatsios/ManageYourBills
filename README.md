@@ -1,6 +1,8 @@
 # Manage Your Bills
 A simple desktop app, made using Blazor Server and Electron, to manage and keep track of your bills.
 
+[Download for Windows](https://drive.google.com/file/d/1RkIESilyBpwr1T-ikwbMlGlVvjsqFShE/view?usp=sharing)
+
 **Usage:**
 
 First, you need to add some providers, from the "Providers" window. There you can also update delete, archiveand unarchive a provider. An archive provider
@@ -33,4 +35,3 @@ Finally you can see statistics about your bills:
 ![5](https://user-images.githubusercontent.com/65107799/164090588-9cee6ce8-f203-4ef4-895c-004497012cfa.png)
 
 ![6](https://user-images.githubusercontent.com/65107799/164090915-10640620-03e0-42b7-b8ad-20cd35622ca0.png)
-
