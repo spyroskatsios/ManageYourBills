@@ -1,0 +1,50 @@
+﻿<div class="top-row ps-3 navbar navbar-dark">
+    <div style="margin:auto; margin-top:20px !important">
+        @*class="container-fluid" *@
+        <a class="navbar-brand font-weight-bold h1" style="text-align:center; font-size:1.8rem !important;" href=""> Manage <br /> Your Bills</a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="addbill">
+                <MudIcon Icon="@Icons.Material.Filled.Add" /> &nbsp; Add Bill
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="bills">
+                <MudIcon Icon="@Icons.Material.Filled.List" /> &nbsp; Bills
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="providers">
+                <MudIcon Icon="@Icons.Material.Filled.Category" /> &nbsp; Providers
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="stats">
+                <MudIcon Icon="@Icons.Material.Filled.QueryStats" /> &nbsp; Statistics
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="addbillsfromfile">
+                <MudIcon Icon="@Icons.Material.Filled.DriveFileMove" /> &nbsp; Add From File
+            </NavLink>
+        </div>
+    </nav>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}

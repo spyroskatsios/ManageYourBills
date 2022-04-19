@@ -1,0 +1,14 @@
+﻿<MudDialog>
+    <DialogContent>
+        <AddProviderComponent OnCreated="OnCreated"></AddProviderComponent>
+    </DialogContent>
+</MudDialog>
+
+@code {
+
+    [CascadingParameter]
+    MudDialogInstance MudDialog { get; set; }
+
+    private void OnCreated()
+        => MudDialog.Close(DialogResult.Ok(true));
+}
