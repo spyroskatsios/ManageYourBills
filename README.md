@@ -1,7 +1,7 @@
 # Manage Your Bills
 A simple desktop app, made using Blazor Server and Electron, to manage and keep track of your bills.
 
-**Download for windows**: You can find the installation file in the assets of this [release](https://github.com/spyroskatsios/ManageYourBills/releases/tag/v1.0.0) or you can just downloaded it from [here](https://drive.google.com/file/d/18Oq89omVP2-mLTGUgTTv-LtRjrriodfa/view?usp=sharing).
+**Download for windows**: You can find the installation file in the assets of this [release](https://github.com/spyroskatsios/ManageYourBills/releases/tag/1.0.0) or you can just downloaded it from [here](https://drive.google.com/file/d/1aS0wdhfkZBlUXZ5Ex6J3OV5f3EwgBaUT/view?usp=share_link).
 
 **Usage:**
 
