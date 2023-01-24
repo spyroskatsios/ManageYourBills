@@ -1,0 +1,187 @@
+﻿@page "/stats";
+@using System.ComponentModel.DataAnnotations
+@inject IDispatcher Dispatcher;
+@implements IDisposable
+
+@if (billTypes is null)
+{
+    <MudOverlay Visible="true" DarkBackground="false" Absolute="true">
+        <MudProgressCircular Color="Color.Secondary" Indeterminate="true" />
+    </MudOverlay>
+}
+else
+{
+    <EditForm Model="request" OnValidSubmit="OnValidSubmit">
+        <DataAnnotationsValidator />
+
+        <MudGrid>
+
+            <MudItem md="4">
+                <MudSelect Clearable="true" T="string" Text="@(request.Type is null? string.Empty : request.Type)"
+                       Label="Type" Variant="Variant.Outlined" Format="F2" AnchorOrigin="Origin.BottomCenter" @bind-Value="request.Type">
+                    @foreach (var type in billTypes)
+                    {
+                        <MudSelectItem Value="type">@type</MudSelectItem>
+                    }
+                </MudSelect>
+                <ValidationMessage For="@(()=>request.Type)" />
+            </MudItem>
+
+            <MudItem md="4">
+                <MudDatePicker @bind-Date="request.From" Variant="Variant.Outlined" AutoClose="true" Label="From" @ref="fromPicker">
+                    <MudButton Class="mr-auto align-self-start" OnClick="@(() => fromPicker.Clear())">Clear</MudButton>
+                    <MudButton Color="Color.Primary" OnClick="@(() => fromPicker.Close())">Ok</MudButton>
+                </MudDatePicker>
+                <ValidationMessage For="@(()=>request.From)" />
+            </MudItem>
+
+            <MudItem md="4">
+                <MudDatePicker @bind-Date="request.To" Variant="Variant.Outlined" AutoClose="true" Label="To" @ref="toPicker">
+                    <MudButton Class="mr-auto align-self-start" OnClick="@(() => toPicker.Clear())">Clear</MudButton>
+                    <MudButton Color="Color.Primary" OnClick="@(() => toPicker.Close())">Ok</MudButton>
+                </MudDatePicker>
+                <ValidationMessage For="@(()=>request.To)" />
+            </MudItem>
+
+            <MudItem md="4"></MudItem>
+            <MudItem md="4"></MudItem>
+
+            <MudItem md="4">
+                <MudButton Style="margin-top: 55px" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Send" Color="Color.Primary"
+                       ButtonType="MudBlazor.ButtonType.Submit">Go</MudButton>
+            </MudItem>
+
+
+        </MudGrid>
+
+    </EditForm>
+
+    @if (payments.Any() && totals.Any())
+    {
+        <MudPaper Style="margin-top: 50px">
+            <MudText Align="Align.Center">Cost of @typeDisplay bills from @from to @to.</MudText>
+            <MudChart ChartType="ChartType.Line" ChartOptions="@(new ChartOptions { MaxNumYAxisTicks = 10, })" ChartSeries="@payments" XAxisLabels="@xPaymentsLabels" Width="100%" Height="350px"></MudChart>
+        </MudPaper>
+
+        <MudPaper Style="margin-top: 50px">
+            <MudText Align="Align.Center">Total Cost for every type of bill from @from to @to</MudText>
+            <MudChart ChartType="ChartType.Bar" ChartOptions="@(new ChartOptions { MaxNumYAxisTicks = 10, YAxisTicks=100 })" ChartSeries="@totals" Width="100%" Height="350px"></MudChart>
+        </MudPaper>
+    }
+    else
+    {
+        <MudText Align="Align.Center">@noDataMessage</MudText>
+    }
+}
+
+<MudOverlay Visible="loading" DarkBackground="false" Absolute="true">
+    <MudProgressCircular Color="Color.Secondary" Indeterminate="true" />
+</MudOverlay>
+
+
+
+@code {
+
+    private List<ChartSeries> payments;
+    private List<ChartSeries> totals;
+    private ChartOptions barOptions;
+    private string[] xPaymentsLabels;
+    private string[] xTotalsLabels;
+    private IEnumerable<string> billTypes;
+    private BillCostRequest request;
+    private DateOnly from;
+    private DateOnly to;
+    private string typeDisplay;
+    private bool loading;
+    private string noDataMessage;
+    private CancellationTokenSource cts;
+
+    private MudDatePicker fromPicker;
+    private MudDatePicker toPicker;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        cts = new CancellationTokenSource();
+        barOptions = new ChartOptions { MaxNumYAxisTicks = 10, YAxisFormat = "" };
+        loading = false;
+        request = new();
+        noDataMessage = string.Empty;
+        xPaymentsLabels = Enumerable.Empty<string>().ToArray();
+        payments = Enumerable.Empty<ChartSeries>().ToList();
+        totals = Enumerable.Empty<ChartSeries>().ToList();
+        billTypes = await Dispatcher.SendAsync(new GetBillTypesQuery());
+    }
+
+
+    private async Task OnValidSubmit()
+    {
+        loading = true;
+
+        StateHasChanged();
+
+        from = DateOnly.FromDateTime(request.From!.Value);
+        to = DateOnly.FromDateTime(request.To!.Value);
+
+        var paymentsResponse = await Dispatcher.SendAsync(new GetBillPaymentsQuery(request.Type, from, to), cts.Token);
+
+        var totalsResponse = await Dispatcher.SendAsync(new GetTotalBillsCostQuery(from, to), cts.Token);
+
+        SetLineChart(paymentsResponse);
+        SetBarChart(totalsResponse);
+
+        loading = false;
+
+        if (!payments.Any() && !totals.Any())
+        {
+            noDataMessage = $"No Data found from {from} to {to}";
+        }
+
+        typeDisplay = request.Type;
+
+        StateHasChanged();
+    }
+
+    private void SetLineChart(IEnumerable<BillPaymentResponse> paymentsResponse)
+    {
+        xPaymentsLabels = paymentsResponse.Select(x => x.Date.ToString()).ToArray();
+
+        if (!paymentsResponse.Any())
+        {
+            return;
+        }
+
+        payments = new List<ChartSeries>()
+        {
+            new ChartSeries() { Name = request.Type, Data = paymentsResponse.Select(x=> (double)x.Cost).ToArray() },
+        };
+    }
+
+    private void SetBarChart(IEnumerable<TotalTypeCostResponse> response)
+    {
+        totals = new List<ChartSeries>();
+
+        foreach (var item in response)
+        {
+            totals.Add(new ChartSeries() { Name = item.Type, Data = new double[] { (double)item.Cost } });
+        }
+
+    }
+
+    public class BillCostRequest
+    {
+        [Required]
+        public string Type { get; set; }
+
+        [Required]
+        public DateTime? From { get; set; }
+
+        [Required]
+        public DateTime? To { get; set; }
+    }
+
+    public void Dispose()
+    {
+    }
+
+}

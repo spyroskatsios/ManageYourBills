@@ -1,0 +1,35 @@
+﻿@inherits ErrorBoundary
+@using ValidationException = ManageYourBills.Application.Exceptions.ValidationException;
+
+@if (CurrentException is null)
+{
+    @ChildContent
+}
+else if (CurrentException is ValidationException exception)
+{
+    @foreach (var failure in exception.Failures)
+    {
+        <MudText Typo="Typo.h5" Align="Align.Center">@CurrentException.Message</MudText>
+
+        <MudText Typo="Typo.h6" Align="Align.Left">@failure.Key :</MudText>
+
+        @foreach (var error in failure.Value)
+        {
+            <MudText Align="Align.Left">@error</MudText>
+        }
+    }
+}
+else
+{
+    <MudText Typo="Typo.h3" Align="Align.Center">@CurrentException.Message</MudText>
+
+}
+
+@code {
+    protected override Task OnErrorAsync(Exception exception)
+    {
+        return base.OnErrorAsync(exception);
+    }
+
+
+}

@@ -1,0 +1,62 @@
+﻿@inject IDispatcher Dispatcher
+
+@if (Provider is null)
+{
+    <MudOverlay Visible="true" DarkBackground="true" Absolute="true">
+        <MudProgressCircular Color="Color.Secondary" Indeterminate="true" />
+    </MudOverlay>
+
+}
+else
+{
+    <EditForm Model="Provider" OnValidSubmit="OnValidSubmit">
+        <DataAnnotationsValidator />
+
+        <MudGrid>
+
+            <MudItem md="12">
+                <MudTextField Label="Name" Variant="Variant.Outlined" @bind-Value="Provider.Name"></MudTextField>
+                <ValidationMessage For="@(()=>Provider.Name)" />
+            </MudItem>
+
+            <MudItem md="4"></MudItem>
+            <MudItem md="4">
+                <MudButton Style="margin-bottom:5px" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Save" Color="Color.Primary" ButtonType="ButtonType.Submit">Update</MudButton>
+            </MudItem>
+            <MudItem md="4"></MudItem>
+
+
+        </MudGrid>
+
+    </EditForm>
+}
+
+
+
+@code {
+
+    [Parameter]
+    public ProviderModel Provider { get; set; }
+
+    [Parameter]
+    public EventCallback OnUpdated { get; set; }
+
+    [Parameter]
+    public EventCallback OnNotFound { get; set; }
+
+    private bool loading = false;
+
+    private async Task OnValidSubmit()
+    {
+        loading = true;
+        var result = await Dispatcher.SendAsync(new UpdateProviderCommand(Provider.Id, Provider.Name));
+
+        if (!result)
+        {
+            await OnNotFound.InvokeAsync();
+        }
+
+        await OnUpdated.InvokeAsync();
+        loading = false;
+    }
+}

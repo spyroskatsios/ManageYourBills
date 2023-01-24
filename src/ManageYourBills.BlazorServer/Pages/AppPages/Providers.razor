@@ -1,0 +1,221 @@
+﻿@page "/providers"
+@inject IDispatcher Dispatcher
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+@if (providers is null)
+{
+    <MudOverlay Visible="true" Absolute="true">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    </MudOverlay>
+}
+else
+{
+    <MudTable Items="@providers" Striped="true">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6" Align="Align.Center">Providers</MudText>
+            <MudGrid>
+                <MudItem md="10"></MudItem>
+                <MudItem md="2">
+                    <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" Size="Size.Medium" OnClick="@(()=>Create())">Add</MudIconButton>
+                </MudItem>
+            </MudGrid>
+        </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Name</MudTh>
+            <MudTh>Active</MudTh>
+            <MudTh>Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Name">@context.Name</MudTd>
+            <MudTd DataLabel="Active">
+                @if (!context.Archived)
+                {
+                <MudIcon Icon="@Icons.Filled.Check" Color="Color.Success"></MudIcon>
+                }
+                else
+                {
+                <MudIcon Icon="@Icons.Filled.Remove" Color="Color.Error"></MudIcon>
+                }
+        </MudTd>
+        <MudTd DataLabel="Actions">
+            <MudTooltip>
+                <ChildContent>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="@(()=>Update(context))"></MudIconButton>
+                </ChildContent>
+                <TooltipContent> Edit Provider </TooltipContent>
+            </MudTooltip>
+
+            <MudTooltip>
+                <ChildContent>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(()=>Delete(context))"></MudIconButton>
+                </ChildContent>
+                <TooltipContent> Delete Provider </TooltipContent>
+            </MudTooltip>
+
+            @if (!context.Archived)
+                {
+                <MudTooltip>
+                    <ChildContent>
+                        <MudIconButton Icon="@Icons.Material.Filled.Archive" Color="Color.Primary" OnClick="@(()=>Archive(context))"></MudIconButton>
+                    </ChildContent>
+                    <TooltipContent>
+                        Archive Provider so it doesn't appear anymore at the bill page dropdown. Note that it will not be deleted and it will still appear in your providers list.
+                    </TooltipContent>
+                </MudTooltip>
+                }
+                else
+                {
+                <MudTooltip>
+                    <ChildContent>
+                        <MudIconButton Icon="@Icons.Material.Filled.Unarchive" Color="Color.Primary" OnClick="@(()=>UnArchive(context))"></MudIconButton>
+                    </ChildContent>
+                    <TooltipContent> Unarchive Provider </TooltipContent>
+                </MudTooltip>
+                }
+        </MudTd>
+    </RowTemplate>
+</MudTable>
+}
+
+
+
+
+@code {
+
+    private IEnumerable<ProviderResponse> providers;
+    private CancellationTokenSource cts;
+    private GetAllProvidersQuery getAllProvidersQuery;
+    private bool loading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        cts = new CancellationTokenSource();
+        getAllProvidersQuery = new GetAllProvidersQuery();
+        providers = await Dispatcher.SendAsync(getAllProvidersQuery, cts.Token);
+    }
+
+    private async Task Create()
+    {
+        var result = await DialogService.Show<AddProviderDialog>("Add Provider").Result;
+
+        if (result.Cancelled)
+        {
+            return;
+        }
+
+        providers = await Dispatcher.SendAsync(getAllProvidersQuery, cts.Token);
+        Snackbar.Add("Provider has been added successfully!", Severity.Success);
+
+    }
+
+
+    private async Task Update(ProviderResponse providerResponse)
+    {
+        var result = await DialogService.Show<UpdateProviderDialog>("Update Provider", new DialogParameters
+            {
+                ["Provider"] = new ProviderModel(providerResponse.Id, providerResponse.Name)
+            }).Result;
+
+        if (result.Cancelled)
+        {
+            return;
+        }
+
+        if ((bool)result.Data == false)
+        {
+            Snackbar.Add("Provider Not Found", Severity.Error);
+            return;
+        }
+
+        providers = await Dispatcher.SendAsync(getAllProvidersQuery, cts.Token);
+        Snackbar.Add("Provider has been updated successfully!", Severity.Success);
+    }
+
+
+    private async Task Delete(ProviderResponse providerResponse)
+    {
+        var dialogResult = await DialogService.Show<WarningDialog>("Delete Provider", new DialogParameters
+            {
+                ["Text"] = $"Are you sure you want to delete provider {providerResponse.Name}? Every bill from this provider will be deleted too!!!"
+            }).Result;
+
+        if (dialogResult.Cancelled)
+        {
+            return;
+        }
+
+        loading = true;
+
+        var result = await Dispatcher.SendAsync(new DeleteProviderCommand(providerResponse.Id));
+
+        if (!result)
+        {
+            Snackbar.Add("Provider Not Found!", Severity.Error);
+            loading = false;
+            return;
+        }
+
+        providers = await Dispatcher.SendAsync(getAllProvidersQuery, cts.Token);
+        loading = false;
+        Snackbar.Add("Provider has been deleted successfully!", Severity.Success);
+
+    }
+
+    private async Task Archive(ProviderResponse providerResponse)
+    {
+
+        var dialogResult = await DialogService.Show<WarningDialog>("Archive Provider", new DialogParameters
+            {
+                ["Text"] = $"Are you sure you want to archive provider {providerResponse.Name}? It won't be shown at your select options for new bills anymore."
+            }).Result;
+
+        if (dialogResult.Cancelled)
+        {
+            return;
+        }
+
+        loading = true;
+
+        var result = await Dispatcher.SendAsync(new ChangeProviderStatusCommand(providerResponse.Id));
+
+        if (!result)
+        {
+            Snackbar.Add("Provider Not Found!", Severity.Error);
+            loading = false;
+            return;
+        }
+
+        providers = await Dispatcher.SendAsync(getAllProvidersQuery, cts.Token);
+        loading = false;
+        Snackbar.Add("Provider has been archived successfully!", Severity.Success);
+    }
+
+    private async Task UnArchive(ProviderResponse providerResponse)
+    {
+        loading = true;
+
+        var result = await Dispatcher.SendAsync(new ChangeProviderStatusCommand(providerResponse.Id));
+
+        if (!result)
+        {
+            Snackbar.Add("Provider Not Found!", Severity.Error);
+            loading = false;
+            return;
+        }
+
+        providers = await Dispatcher.SendAsync(getAllProvidersQuery, cts.Token);
+        loading = false;
+        Snackbar.Add("Provider has been unarchived successfully!", Severity.Success);
+    }
+
+    public void Dispose()
+    {
+        cts.Cancel();
+        cts.Dispose();
+    }
+
+}
+
+

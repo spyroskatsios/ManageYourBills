@@ -1,0 +1,271 @@
+﻿@page "/bills"
+@inject IDispatcher Dispatcher
+@inject IMapper Mapper
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+@if (billTypes is null || providers is null || orderParameters is null)
+{
+    <MudOverlay Visible="true" DarkBackground="false" Absolute="true">
+        <MudProgressCircular Color="Color.Secondary" Indeterminate="true" />
+    </MudOverlay>
+}
+else
+{
+    @if (showSearch)
+    {
+        <MudPaper Style="margin-bottom:50px">
+            <MudGrid>
+
+                <MudItem md="3">
+                    <MudSelect Clearable="true" T="string"
+                       Label="Type" Variant="Variant.Outlined" Format="F2" AnchorOrigin="Origin.BottomCenter" @bind-Value="parameters.BillType">
+                        @foreach (var type in billTypes)
+                        {
+                            <MudSelectItem Value="type">@type</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem md="3">
+                    <MudSelect Clearable="true" T="ProviderModel"
+                       Label="Provider" Variant="Variant.Outlined" Format="F2" AnchorOrigin="Origin.BottomCenter" @bind-Value="parameters.Provider">
+                        @foreach (var provider in providers)
+                        {
+                            <MudSelectItem Value="provider">@provider.Name</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+
+                <MudItem md="3">
+                    <MudDatePicker @bind-Date="parameters.ExpirationFrom" Variant="Variant.Outlined" AutoClose="true" Label="Expiration Date From" @ref="expirationFromPicker">
+                        <MudButton Class="mr-auto align-self-start" OnClick="@(() => expirationFromPicker.Clear())">Clear</MudButton>
+                        <MudButton Color="Color.Primary" OnClick="@(() => expirationFromPicker.Close())">Ok</MudButton>
+                    </MudDatePicker>
+                </MudItem>
+
+                <MudItem md="3">
+                    <MudDatePicker @bind-Date="parameters.ExpirationTo" Variant="Variant.Outlined" AutoClose="true" Label="Expiration Date To" @ref="expirationToPicker">
+                        <MudButton Class="mr-auto align-self-start" OnClick="@(() => expirationToPicker.Clear())">Clear</MudButton>
+                        <MudButton Color="Color.Primary" OnClick="@(() => expirationToPicker.Close())">Ok</MudButton>
+                    </MudDatePicker>
+                </MudItem>
+
+                <MudItem md="3">
+                    <MudDatePicker @bind-Date="parameters.PaidAtFrom" Variant="Variant.Outlined" AutoClose="true" Label="Paid Date From" @ref="paidAtFrom">
+                        <MudButton Class="mr-auto align-self-start" OnClick="@(() => paidAtFrom.Clear())">Clear</MudButton>
+                        <MudButton Color="Color.Primary" OnClick="@(() => paidAtFrom.Close())">Ok</MudButton>
+                    </MudDatePicker>
+                </MudItem>
+
+                <MudItem md="3">
+                    <MudDatePicker @bind-Date="parameters.PaidAtTo" Variant="Variant.Outlined" AutoClose="true" Label="Paid Date To" @ref="paidAtTo">
+                        <MudButton Class="mr-auto align-self-start" OnClick="@(() => paidAtTo.Clear())">Clear</MudButton>
+                        <MudButton Color="Color.Primary" OnClick="@(() => paidAtTo.Close())">Ok</MudButton>
+                    </MudDatePicker>
+                </MudItem>
+
+                <MudItem md="3">
+                    <MudNumericField Variant="Variant.Outlined" Label="Cost From" @bind-Value="parameters.CostFrom"></MudNumericField>
+                </MudItem>
+
+                <MudItem md="3">
+                    <MudNumericField Variant="Variant.Outlined" Label="Cost To" @bind-Value="parameters.CostTo"></MudNumericField>
+                </MudItem>
+
+                <MudItem md="8"></MudItem>
+
+                <MudItem md=2>
+                    <MudButton Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Clear" Color="Color.Error" OnClick="ClearParameters">Clear</MudButton>
+                </MudItem>
+
+                <MudItem md=2>
+                    <MudButton Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Search" Color="Color.Primary" OnClick="Search">Search</MudButton>
+                </MudItem>
+
+            </MudGrid>
+        </MudPaper>
+    }
+
+    <MudTable ServerData="@(new Func<TableState, Task<TableData<BillResponse>>>(ServerReloadAsync))" Dense="true" Striped="true" RowsPerPage="25" @ref="table">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Bills</MudText>
+
+            <MudGrid>
+                <MudItem md="2"></MudItem>
+
+                <MudItem md="2">
+                    <MudText Align="Align.Center" Style="margin-top:20px">Order By:</MudText>
+                </MudItem>
+
+                <MudItem md="2">
+                    <MudSelect T="string" Margin="Margin.Dense" Value="parameters.OrderParameter" ValueChanged="OrderParameterChanged">
+                        @foreach (var parameter in orderParameters)
+                    {
+                        <MudSelectItem Value="parameter">@parameter</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem md="1">
+                @if (parameters.SortOrder == "Ascending")
+                {
+                    <MudIconButton Icon="@Icons.Filled.KeyboardArrowDown" Style="margin-top:10px" OnClick="SortOrderChanged" />
+                }
+                else
+                {
+                    <MudIconButton Icon="@Icons.Filled.KeyboardArrowUp" Style="margin-top:10px" OnClick="SortOrderChanged" />
+                }
+            </MudItem>
+
+        </MudGrid>
+
+        <MudSpacer />
+
+        @if (searchParameters)
+        {
+            <MudSpacer />
+            <MudText>Search parameters have been applied.</MudText>
+        }
+
+        <MudIconButton Icon="@Icons.Material.Filled.Search" OnClick="@(()=>showSearch=!showSearch)"></MudIconButton>
+
+    </ToolBarContent>
+
+    <HeaderContent>
+        <MudTh>Type</MudTh>
+        <MudTh>Provider</MudTh>
+        <MudTh>Issued</MudTh>
+        <MudTh>From</MudTh>
+        <MudTh>To</MudTh>
+        <MudTh>Expiration</MudTh>
+        <MudTh>Cost</MudTh>
+        <MudTh>Is Paid</MudTh>
+        <MudTh>Paid At</MudTh>
+    </HeaderContent>
+
+    <RowTemplate>
+        <MudTd Style="cursor:pointer" DataLabel="Type" onclick="@(()=>NavigationManager.NavigateTo($"/updatebill/{context.Id}"))">@context.Type</MudTd>
+        <MudTd Style="cursor:pointer" DataLabel="Provider" onclick="@(()=>NavigationManager.NavigateTo($"/updatebill/{context.Id}"))">@context.Provider.Name</MudTd>
+        <MudTd Style="cursor:pointer" DataLabel="Issued" onclick="@(()=>NavigationManager.NavigateTo($"/updatebill/{context.Id}"))">@context.Issued</MudTd>
+        <MudTd Style="cursor:pointer" DataLabel="From" onclick="@(()=>NavigationManager.NavigateTo($"/updatebill/{context.Id}"))">@context.From</MudTd>
+        <MudTd Style="cursor:pointer" DataLabel="To" onclick="@(()=>NavigationManager.NavigateTo($"/updatebill/{context.Id}"))">@context.To</MudTd>
+        <MudTd Style="cursor:pointer" DataLabel="Expiration" onclick="@(()=>NavigationManager.NavigateTo($"/updatebill/{context.Id}"))">@context.Expiration</MudTd>
+        <MudTd Style="cursor:pointer" DataLabel="Cost" onclick="@(()=>NavigationManager.NavigateTo($"/updatebill/{context.Id}"))">@context.Cost</MudTd>
+        <MudTd Style="cursor:pointer" DataLabel="Is Paid" onclick="@(()=>NavigationManager.NavigateTo($"/updatebill/{context.Id}"))">
+            @if (context.IsPaid)
+                {
+                <MudIcon Icon="@Icons.Filled.Check" Color="Color.Success"></MudIcon>
+                }
+                else
+                {
+                <MudIcon Icon="@Icons.Filled.Remove" Color="Color.Error"></MudIcon>
+                }
+        </MudTd>
+        <MudTd Style="cursor:pointer" DataLabel="Paid At" onclick="@(()=>NavigationManager.NavigateTo($"/updatebill/{context.Id}"))">
+            @(context.PaidAt is null? string.Empty : context.PaidAt.Value)
+        </MudTd>
+
+    </RowTemplate>
+
+    <PagerContent>
+        <MudTablePager PageSizeOptions="new int[] {10,25,50}" />
+    </PagerContent>
+
+</MudTable>
+
+}
+
+
+
+@code {
+    private PagedList<BillResponse> bills;
+    private BillsParameters parameters;
+    private IEnumerable<string> billTypes;
+    private IEnumerable<ProviderModel> providers;
+    private IEnumerable<string> orderParameters;
+    private IEnumerable<string> sortOrderOption;
+    private CancellationTokenSource cts;
+    private bool isNewSearch;
+    private bool showSearch;
+    private bool searchParameters;
+
+    private MudDatePicker expirationFromPicker;
+    private MudDatePicker expirationToPicker;
+    private MudDatePicker paidAtFrom;
+    private MudDatePicker paidAtTo;
+
+    private MudTable<BillResponse> table;
+
+    protected override async Task OnInitializedAsync()
+    {
+        parameters = new BillsParameters();
+        cts = new CancellationTokenSource();
+        sortOrderOption = new List<string> { "Ascending", "Descending" };
+
+        var billTypesTask = Dispatcher.SendAsync(new GetBillTypesQuery(), cts.Token);
+        var providersTask = Dispatcher.SendAsync(new GetAllProvidersQuery(), cts.Token);
+        var orderParametersTask = Dispatcher.SendAsync(new GetBillOrderParametersQuery(), cts.Token);
+
+        await Task.WhenAll(billTypesTask, providersTask, orderParametersTask);
+
+        billTypes = billTypesTask.Result;
+        providers = Mapper.Map(providersTask.Result);
+        orderParameters = orderParametersTask.Result;
+    }
+
+    private async Task<TableData<BillResponse>> ServerReloadAsync(TableState state)
+    {
+
+        if (!isNewSearch)
+        {
+            parameters.PageNumber = state.Page + 1;
+        }
+
+        parameters.PageSize = state.PageSize;
+
+        bills = await Dispatcher.SendAsync(Mapper.Map(parameters));
+
+        return new TableData<BillResponse>
+            {
+                Items = bills,
+                TotalItems = bills.MetaData.TotalCount
+            };
+    }
+
+    private async Task OrderParameterChanged(string value)
+    {
+        isNewSearch = true;
+        parameters.OrderParameter = value;
+        await table.ReloadServerData();
+    }
+
+    private async Task SortOrderChanged()
+    {
+        parameters.SortOrder = parameters.SortOrder == "Ascending" ? parameters.SortOrder = "Descending" : parameters.SortOrder = "Ascending";
+        isNewSearch = true;
+        await table.ReloadServerData();
+    }
+
+    private async Task Search()
+    {
+        isNewSearch = true;
+        showSearch = false;
+        searchParameters = true;
+        await table.ReloadServerData();
+    }
+
+    private async Task ClearParameters()
+    {
+        parameters = new BillsParameters();
+        searchParameters = false;
+        await table.ReloadServerData();
+    }
+
+    public void Dispose()
+    {
+        cts.Cancel();
+        cts.Dispose();
+    }
+
+}

@@ -1,0 +1,22 @@
+﻿<MudDialog>
+    <DialogContent>
+        <UpdateIndicationComponent Provider="Provider" OnUpdated="OnUpdated" OnNotFound="OnNotFound">
+        </UpdateIndicationComponent>
+    </DialogContent>
+</MudDialog>
+
+@code {
+
+    [CascadingParameter]
+    MudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public ProviderModel Provider { get; set; }
+
+
+    private void OnUpdated()
+    => MudDialog.Close(DialogResult.Ok(true));
+
+    private void OnNotFound()
+     => MudDialog.Close(DialogResult.Ok(false));
+}

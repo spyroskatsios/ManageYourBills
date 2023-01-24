@@ -1,0 +1,51 @@
+﻿@inject IDispatcher Dispatcher
+
+@if (provider is null)
+{
+    <MudOverlay Visible="true" DarkBackground="true" Absolute="true">
+        <MudProgressCircular Color="Color.Secondary" Indeterminate="true" />
+    </MudOverlay>
+}
+else
+{
+    <EditForm Model="provider" OnValidSubmit="OnValidSubmit">
+        <DataAnnotationsValidator />
+
+        <MudGrid>
+            <MudItem md="12">
+                <MudTextField Label="Name" Variant="Variant.Outlined" @bind-Value="provider.Name"></MudTextField>
+                <ValidationMessage For="@(()=>provider.Name)" />
+            </MudItem>
+
+            <MudItem md="4"></MudItem>
+            <MudItem md="4"> <MudButton Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Add" Color="Color.Primary" ButtonType="ButtonType.Submit">Add</MudButton></MudItem>
+            <MudItem md="4"></MudItem>
+        </MudGrid>
+
+    </EditForm>
+}
+
+
+
+
+
+<MudOverlay Visible="loading" DarkBackground="true" Absolute="true">
+    <MudProgressCircular Color="Color.Secondary" Indeterminate="true" />
+</MudOverlay>
+
+@code {
+
+    [Parameter]
+    public EventCallback OnCreated { get; set; }
+
+    private ProviderModel provider = new();
+    private bool loading = false;
+
+    private async Task OnValidSubmit()
+    {
+        loading = true;
+        await Dispatcher.SendAsync(new CreateProviderCommand(provider.Name));
+        await OnCreated.InvokeAsync();
+        loading = false;
+    }
+}

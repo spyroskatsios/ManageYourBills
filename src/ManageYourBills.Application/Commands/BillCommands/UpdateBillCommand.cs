@@ -1,0 +1,9 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace ManageYourBills.Application.Commands.BillCommands;
+public record UpdateBillCommand(Guid Id, string Type, Guid ProviderId, DateOnly Issued, DateOnly From, DateOnly To, DateOnly Expiration,
+    string Comments, decimal Cost, bool IsPaid, DateOnly? PaidAt) : IRequest<bool>;

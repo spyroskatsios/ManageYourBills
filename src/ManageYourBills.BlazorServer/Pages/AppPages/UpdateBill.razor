@@ -1,0 +1,200 @@
+﻿@page "/updatebill/{Id:guid}"
+@inject IDispatcher Dispatcher
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject IMapper Mapper
+@inject NavigationManager NavigationManager
+@implements IDisposable;
+
+
+@if (bill is null || billTypes is null || providers is null)
+{
+    <MudOverlay Visible="true" DarkBackground="false" Absolute="true">
+        <MudProgressCircular Color="Color.Secondary" Indeterminate="true" />
+    </MudOverlay>
+}
+else
+{
+    <MudGrid>
+        <MudItem md="10">
+            <MudText Align="Align.Center" Typo="Typo.h5" Style="margin-bottom: 30px" Color="Color.Primary">Update Bill</MudText>
+        </MudItem>
+        <MudItem md="2">
+            <MudButton Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="DeleteBill">Delete</MudButton>
+        </MudItem>
+    </MudGrid>
+
+    <EditForm Model="bill" OnValidSubmit="OnValidSubmit">
+        <DataAnnotationsValidator />
+
+        <MudGrid>
+            <MudItem md="4">
+                <MudSelect Clearable="true" T="string"
+                       Label="Type*" Variant="Variant.Outlined" Format="F2" AnchorOrigin="Origin.BottomCenter" @bind-Value="bill.Type">
+                    @foreach (var type in billTypes)
+                    {
+                        <MudSelectItem Value="type">@type</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem md="4">
+                <MudSelect Clearable="true" T="ProviderModel"
+                       Label="Provider*" Variant="Variant.Outlined" Format="F2" AnchorOrigin="Origin.BottomCenter" @bind-Value="bill.Provider">
+                    @foreach (var provider in providers)
+                    {
+                        <MudSelectItem Value="provider">@provider.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+
+            <MudItem md="4">
+                <MudDatePicker @bind-Date="bill.Issued" Variant="Variant.Outlined" AutoClose="true" Label="Issued Date*" @ref="issuePicker">
+                    <MudButton Class="mr-auto align-self-start" OnClick="@(() => issuePicker.Clear())">Clear</MudButton>
+                    <MudButton Color="Color.Primary" OnClick="@(() => issuePicker.Close())">Ok</MudButton>
+                </MudDatePicker>
+                <ValidationMessage For="@(()=>bill.From)" />
+            </MudItem>
+
+            <MudItem md="4">
+                <MudDatePicker @bind-Date="bill.Expiration" Variant="Variant.Outlined" AutoClose="true" Label="Expiration Date*" @ref="expirationPicker">
+                    <MudButton Class="mr-auto align-self-start" OnClick="@(() => expirationPicker.Clear())">Clear</MudButton>
+                    <MudButton Color="Color.Primary" OnClick="@(() => expirationPicker.Close())">Ok</MudButton>
+                </MudDatePicker>
+                <ValidationMessage For="@(()=>bill.Expiration)" />
+            </MudItem>
+
+            <MudItem md="4">
+                <MudDatePicker @bind-Date="bill.From" Variant="Variant.Outlined" AutoClose="true" Label="Consumption From*" @ref="fromPicker">
+                    <MudButton Class="mr-auto align-self-start" OnClick="@(() => fromPicker.Clear())">Clear</MudButton>
+                    <MudButton Color="Color.Primary" OnClick="@(() => fromPicker.Close())">Ok</MudButton>
+                </MudDatePicker>
+                <ValidationMessage For="@(()=>bill.From)" />
+            </MudItem>
+
+            <MudItem md="4">
+                <MudDatePicker @bind-Date="bill.To" Variant="Variant.Outlined" AutoClose="true" Label="Consumption To*" @ref="toPicker">
+                    <MudButton Class="mr-auto align-self-start" OnClick="@(() => toPicker.Clear())">Clear</MudButton>
+                    <MudButton Color="Color.Primary" OnClick="@(() => toPicker.Close())">Ok</MudButton>
+                </MudDatePicker>
+                <ValidationMessage For="@(()=>bill.To)" />
+            </MudItem>
+
+            <MudItem md="4">
+                <MudNumericField Label="Cost" Variant="Variant.Outlined" @bind-Value="bill.Cost"></MudNumericField>
+                <ValidationMessage For="@(()=>bill.Cost)" />
+            </MudItem>
+
+            <MudItem md="4">
+                <MudDatePicker @bind-Date="bill.PaidAt" Variant="Variant.Outlined" AutoClose="true" Label="Paid At" @ref="paidAtPicker" Disabled="!bill.IsPaid">
+                    <MudButton Class="mr-auto align-self-start" OnClick="@(() => paidAtPicker.Clear())">Clear</MudButton>
+                    <MudButton Color="Color.Primary" OnClick="@(() => paidAtPicker.Close())">Ok</MudButton>
+                </MudDatePicker>
+                <ValidationMessage For="@(()=>bill.PaidAt)" />
+            </MudItem>
+
+            <MudItem md="4">
+                <MudCheckBox @bind-Checked="bill.IsPaid" Color="Color.Primary" Label="Is Paid" onclick="@(bill.IsPaid? bill.PaidAt=bill.PaidAt : bill.PaidAt=null)">
+                </MudCheckBox>
+            </MudItem>
+
+            <MudItem md="4">
+                <MudTextField Lines="3" Label="Comments" Variant="Variant.Outlined" @bind-Value="bill.Comments"></MudTextField>
+                <ValidationMessage For="@(()=>bill.Comments)" />
+            </MudItem>
+
+            <MudItem md="4"></MudItem>
+
+            <MudItem md="4">
+                <MudButton Style="margin-top: 55px; margin-left: 20px" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Save" Color="Color.Primary"
+                       ButtonType="MudBlazor.ButtonType.Submit">Update</MudButton>
+            </MudItem>
+
+        </MudGrid>
+    </EditForm>
+}
+
+
+
+
+@code {
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private BillModel bill;
+    private IEnumerable<string> billTypes;
+    private IEnumerable<ProviderModel> providers;
+    private CancellationTokenSource cts;
+    private bool loading = false;
+
+    private MudDatePicker expirationPicker;
+    private MudDatePicker fromPicker;
+    private MudDatePicker toPicker;
+    private MudDatePicker paidAtPicker;
+    private MudDatePicker issuePicker;
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        cts = new CancellationTokenSource();
+        bill = Mapper.Map(await Dispatcher.SendAsync(new GetBillByIdQuery(Id), cts.Token));
+
+        var billTypesTask = Dispatcher.SendAsync(new GetBillTypesQuery(), cts.Token);
+        var providersTask = Dispatcher.SendAsync(new GetActiveProvidersQuery(), cts.Token);
+
+        await Task.WhenAll(billTypesTask, providersTask);
+
+        billTypes = billTypesTask.Result;
+        providers = Mapper.Map(providersTask.Result);
+    }
+
+    private async Task OnValidSubmit()
+    {
+        if (bill.IsPaid && bill.PaidAt is null)
+        {
+            throw new Exception("If the bill is paid you must add the date that you paid it!");
+        }
+
+        loading = true;
+        await Dispatcher.SendAsync(Mapper.MapToUpdateCommand(bill));
+        loading = false;
+        Snackbar.Add("Bill has benn added successfully!", Severity.Success);
+        NavigationManager.NavigateTo("/bills");
+    }
+
+    private async Task DeleteBill()
+    {
+        var dialogResult = await DialogService.Show<WarningDialog>("Delete Bill", new DialogParameters
+            {
+                ["Text"] = "Are you sure you want to delete this bill?"
+            }).Result;
+
+        if (dialogResult.Cancelled)
+        {
+            return;
+        }
+
+        loading = true;
+
+        var result = await Dispatcher.SendAsync(new DeleteBillCommand(Id),cts.Token);
+
+        if (!result)
+        {
+            Snackbar.Add("Bill Not Found!", Severity.Error);
+            loading = false;
+            return;
+        }
+
+        loading = false;
+        Snackbar.Add("Bill has been deleted successfully!", Severity.Success);
+        NavigationManager.NavigateTo("/bills");
+    }
+
+    public void Dispose()
+    {
+        cts.Cancel();
+        cts.Dispose();
+    }
+
+}

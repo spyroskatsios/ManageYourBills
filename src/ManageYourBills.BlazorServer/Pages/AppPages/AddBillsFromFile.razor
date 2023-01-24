@@ -1,0 +1,190 @@
+@page "/addbillsfromfile"
+@using System.Text
+@inject IWebHostEnvironment Environment
+@inject IDispatcher Dispatcher
+@inject IJSRuntime JSRuntime
+
+@if (!added)
+{
+    <MudGrid>
+
+        <MudGrid>
+            <MudItem md="12">
+                <MudText>
+                    <b>Instructions:</b> File must be csv. The bill’s fields must be in the following order. Type, Provider, Issue Date,
+                    Expiration Date, Start Date of Consumption, End Date of Consumption, Cost, Is Paid, Payment Date, Comments. Fields Type and Provider must be written
+                    exactly as they appear on the app. For the field Is Paid, acceptable values are "True" or "False". The Comments field is optional. If a bill is paid it must
+                    have a Payment Date, otherwise it must be left empty. Dates must have the following format: day/month/year. Comments must not be more than 500 characters.
+                    Finally, the file can not be more than 15mb. You can download the csv template by pressing here:
+                    <button @onclick="DownloadTemplate" class="btn btn-link">Download Template</button> <br />
+                    It follows an example of a valid file, assuming that providers Provider1 and Provider2 exist:
+                </MudText>
+            </MudItem>
+            <MudItem md="12"> <img src="images/example.png" /> </MudItem>
+        </MudGrid>
+
+        <MudItem md="12"></MudItem>
+        <MudItem md="12"></MudItem>
+
+
+        <MudItem md="4"></MudItem>
+
+        <MudItem md="4">
+            <InputFile id="fileInput" OnChange="UploadFile" hidden />
+            <MudButton HtmlTag="label"
+                   Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Filled.CloudUpload"
+                   for="fileInput">
+                Select File
+            </MudButton>
+        </MudItem>
+
+        <MudItem md="4"></MudItem>
+        <MudItem md="4"></MudItem>
+
+
+        <MudItem md="4">
+            @if (file is not null)
+            {
+                <MudListItem Icon="@Icons.Filled.AttachFile">
+                    @file.Name <code>@(Math.Round(file.Size/1000000.0, 4))<text>MB</text></code> <MudButton StartIcon="@Icons.Filled.Delete" IconColor="Color.Default" OnClick="(()=>file = null)"></MudButton>
+                </MudListItem>
+            }
+        </MudItem>
+
+        <MudItem md="4"></MudItem>
+        <MudItem md="4"></MudItem>
+
+        <MudItem md="4"> <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddFromExcel">Upload</MudButton> </MudItem>
+
+        <MudItem md="4"></MudItem>
+
+        @if (warningText is not null)
+        {
+            <MudItem md="12"> <MudText Color="Color.Error">@warningText</MudText> </MudItem>
+        }
+
+    </MudGrid>
+}
+
+@if (response is not null)
+{
+    @if (response.Errors.ToList().Count > 0)
+    {
+        <MudText Typo="Typo.h6" Align="Align.Center">Errors:</MudText>
+        @foreach (var e in response.Errors)
+        {
+            <MudText Align="Align.Center">@e</MudText>
+        }
+
+        <br />
+        <br />
+    }
+
+    <MudTable Items="response.AddedBills" Striped="true">
+        <ToolBarContent> <MudText Typo="Typo.h6" Align="Align.Center"> Added Bills </MudText> </ToolBarContent>
+        <HeaderContent>
+            <MudTh>Type</MudTh>
+            <MudTh>Provider</MudTh>
+            <MudTh>From</MudTh>
+            <MudTh>To</MudTh>
+            <MudTh>Expiration</MudTh>
+            <MudTh>Cost</MudTh>
+            <MudTh>Is Paid</MudTh>
+            <MudTh>Paid At</MudTh>
+        </HeaderContent>
+
+        <RowTemplate>
+            <MudTd Style="cursor:pointer" DataLabel="Type">@context.Type</MudTd>
+            <MudTd Style="cursor:pointer" DataLabel="Provider">@context.Provider.Name</MudTd>
+            <MudTd Style="cursor:pointer" DataLabel="From">@context.From</MudTd>
+            <MudTd Style="cursor:pointer" DataLabel="To">@context.To</MudTd>
+            <MudTd Style="cursor:pointer" DataLabel="Expiration">@context.Expiration</MudTd>
+            <MudTd Style="cursor:pointer" DataLabel="Cost">@context.Cost</MudTd>
+            <MudTd Style="cursor:pointer" DataLabel="Is Paid">
+                @if (context.IsPaid)
+                {
+                <MudIcon Icon="@Icons.Filled.Check" Color="Color.Success"></MudIcon>
+                }
+                else
+                {
+                <MudIcon Icon="@Icons.Filled.Remove" Color="Color.Error"></MudIcon>
+                }
+        </MudTd>
+        <MudTd Style="cursor:pointer" DataLabel="Paid At">
+            @(context.PaidAt is null? string.Empty : context.PaidAt.Value)
+        </MudTd>
+
+    </RowTemplate>
+</MudTable>
+
+}
+
+<MudOverlay Visible="uploading" Absolute="true">
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+</MudOverlay>
+
+
+
+
+
+@code {
+
+    private bool uploading = false;
+    private bool added = false;
+    private string warningText;
+    private static int maxSize = 1024 * 1024 * 15;
+
+    private IBrowserFile file;
+    private FileResponse response;
+
+    private async Task UploadFile(InputFileChangeEventArgs e)
+        => file = e.File;
+
+    private async Task AddFromExcel()
+    {
+        if (file is null)
+        {
+            warningText = "Choose file!";
+            return;
+        }
+
+        if (!(new string(file.Name.TakeLast(4).ToArray()).Equals(".csv")))
+        {
+            warningText = "File is not csv!";
+            return;
+        }
+
+        if (file.Size > maxSize)
+        {
+            warningText = "File is bigger than 15mb!";
+            return;
+        }
+
+        uploading = true;
+
+        var path = Path.Combine(Directory.GetCurrentDirectory(), "bills.csv");
+
+        var fileStream = new FileStream(path, FileMode.Create);
+        var stream = file.OpenReadStream(maxSize);
+        await stream.CopyToAsync(fileStream);
+        fileStream.Close();
+        stream.Close();
+
+        response = await Dispatcher.SendAsync(new AddBillsFromFileCommand(path));
+
+        File.Delete(path);
+        uploading = false;
+        added = true;
+    }
+
+    private async Task DownloadTemplate()
+    {
+        //var path = Path.Combine(Environment.ContentRootPath, "wwwroot", "template.csv");
+        //var bytes = File.ReadAllBytes(path);
+        var fileStream = File.Open(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "template.csv"), FileMode.Open);
+        using var streamRef = new DotNetStreamReference(stream: fileStream);
+        await JSRuntime.InvokeVoidAsync("downloadFileFromStream", "template.csv", streamRef);
+    }
+}
